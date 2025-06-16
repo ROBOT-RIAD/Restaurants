@@ -224,9 +224,7 @@
 # #env
 
 
-# # STRIPE_SECRET_KEY='sk_test_51Qx4bTC5mhmrUfvY9XR7VLdU8BdIgIDKELv7UjG1pIifhS4P2S6M0tTCUqpatM6Bar12vuButzGebMULJXTQ1zl500tgeYy9MR'
 
-# # STRIPE_WEBHOOK_SECRET='whsec_O4oTAYBj6QJTA802SMOImbjJAqlSC9vO'
 
 # # DATABASES = {
 # #     'default': {
