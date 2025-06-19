@@ -6,22 +6,27 @@ from restaurant.models import Restaurant
 class RestaurantSerializer(serializers.ModelSerializer):
     class Meta:
         model = Restaurant
-        fields = ['resturent_name', 'location', 'starting_date', 'phone_number', 'package', 'image', 'owner']
+        fields = ['resturent_name', 'location', 'phone_number', 'package', 'image', 'owner']
 
 class OwnerRegisterSerializer(serializers.ModelSerializer):
     # restaurant fields
     resturent_name = serializers.CharField(max_length=255)
     location = serializers.CharField(max_length=255)
-    starting_date = serializers.DateField()
-    phone_number = serializers.CharField(max_length=15)
+    phone_number = serializers.CharField(max_length=15,required=False, allow_blank=True)
     package = serializers.CharField(max_length=100)
     image = serializers.ImageField(required=False)
     package = serializers.CharField(max_length=100, required=False, allow_blank=True)
 
     class Meta:
         model = User
-        fields = ['username', 'email', 'password', 'resturent_name', 'location', 'starting_date', 'phone_number', 'package', 'image']
+        fields = ['username', 'email', 'password', 'resturent_name', 'location', 'phone_number', 'package', 'image']
         extra_kwargs = {'password': {'write_only': True}}
+    
+
+    def validate_phone_number(self, value):
+        if Restaurant.objects.filter(phone_number=value).exists():
+            raise serializers.ValidationError("Phone number already exists. Use another number.")
+        return value
         
 
     def create(self, validated_data):
@@ -29,7 +34,6 @@ class OwnerRegisterSerializer(serializers.ModelSerializer):
         rest_data = {
             'resturent_name': validated_data.pop('resturent_name'),
             'location': validated_data.pop('location'),
-            'starting_date': validated_data.pop('starting_date'),
             'phone_number': validated_data.pop('phone_number'),
             # 'package': validated_data.pop('package'),
             'image': validated_data.pop('image', None),

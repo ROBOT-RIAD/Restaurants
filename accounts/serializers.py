@@ -36,76 +36,10 @@ class RegisterSerializer(serializers.ModelSerializer):
 class RestaurantSerializer(serializers.ModelSerializer):
     class Meta:
         model = Restaurant
-        fields = ['id', 'resturent_name', 'location', 'starting_date', 'phone_number', 'package', 'image']
+        fields = ['id', 'resturent_name', 'location', 'phone_number', 'package', 'image']
 
 
 
-
-# class UserWithRestaurantSerializer(serializers.ModelSerializer):
-#     restaurants = serializers.SerializerMethodField()
-
-#     class Meta:
-#         model = User
-#         fields = ['id', 'username', 'email', 'role', 'image', 'restaurants']
-
-#     def get_restaurants(self, obj):
-#         def get_subscription_info(restaurant):
-#             subscription = restaurant.subscriptions.filter(is_active=True).order_by('-created_at').first()
-#             if subscription:
-#                 return {
-#                     'package_name': subscription.package_name,
-#                     'current_period_end': subscription.current_period_end,
-#                     'status': subscription.status,
-#                 }
-#             return {
-#                 'package_name': None,
-#                 'current_period_end': None,
-#                 'status': None,
-#             }
-
-#         # 1. Owned restaurants
-#         owned = obj.restaurants.all()
-#         owned_data = RestaurantSerializer(owned, many=True).data
-#         for r in owned_data:
-#             restaurant_obj = owned.get(id=r['id'])
-#             r['source'] = 'owner'
-#             r['table_name'] = None
-#             r['device_id'] = None
-#             r['subscription'] = get_subscription_info(restaurant_obj)
-
-#         # 2. Staff restaurants
-#         staff_links = obj.staff_roles.all()
-#         staff_restaurants = Restaurant.objects.filter(chefstaffs__in=staff_links)
-#         staff_data = RestaurantSerializer(staff_restaurants, many=True).data
-#         for r in staff_data:
-#             restaurant_obj = staff_restaurants.get(id=r['id'])
-#             r['source'] = 'staff'
-#             r['table_name'] = None
-#             r['device_id'] = None
-#             r['subscription'] = get_subscription_info(restaurant_obj)
-
-#         # 3. Device-linked restaurants
-#         device_links = obj.devices.select_related('restaurant').all()
-#         device_data = []
-#         for device in device_links:
-#             rest = device.restaurant
-#             rest_data = RestaurantSerializer(rest).data
-#             rest_data['source'] = 'device'
-#             rest_data['table_name'] = device.table_name
-#             rest_data['device_id'] = device.id
-#             rest_data['subscription'] = get_subscription_info(rest)
-#             device_data.append(rest_data)
-
-#         # Combine all and remove duplicates by restaurant ID
-#         all_data = owned_data + staff_data + device_data
-#         seen = set()
-#         unique_restaurants = []
-#         for r in all_data:
-#             if r['id'] not in seen:
-#                 seen.add(r['id'])
-#                 unique_restaurants.append(r)
-
-#         return unique_restaurants
 
 
 

@@ -7,7 +7,6 @@ class RestaurantAdmin(admin.ModelAdmin):
     list_display = (
         'resturent_name',
         'location',
-        'starting_date',
         'phone_number',
         'package',
         'image',
