@@ -19,7 +19,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.tokens import OutstandingToken,BlacklistedToken,RefreshToken
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-
+from .utils import get_restaurant_owner_id
 # Create your views here.
 
 class RegisterApiView(CreateAPIView):
@@ -29,59 +29,6 @@ class RegisterApiView(CreateAPIView):
     permission_classes = [AllowAny]
 
 
-
-
-
-
-
-# class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
-
-#     @classmethod
-#     def get_token(cls, user):
-#         token = super().get_token(user)
-#         user_data = UserWithRestaurantSerializer(user).data
-
-#         # Default values
-#         first_restaurant_id = None
-#         first_device_id = None
-#         first_restaurant_package = None
-#         first_restaurant_status = None
-#         first_restaurant_period_end = None
-
-#         # Extract first available restaurant & subscription
-#         for r in user_data['restaurants']:
-#             if first_restaurant_id is None:
-#                 first_restaurant_id = r['id']
-#                 if 'subscription' in r:
-#                     first_restaurant_package = r['subscription'].get('package_name')
-#                     first_restaurant_status = r['subscription'].get('status')
-#                     first_restaurant_period_end = r['subscription'].get('current_period_end')
-
-#             if r.get('device_id') is not None and first_device_id is None:
-#                 first_device_id = r['device_id']
-
-#         token['user'] = {
-#             'id': user_data['id'],
-#             'username': user_data['username'],
-#             'email': user_data['email'],
-#             'role': user_data['role'],
-#             'restaurants_id': first_restaurant_id,
-#             'device_id': first_device_id,
-#             'subscription': {
-#                 'package_name': first_restaurant_package,
-#                 'status': first_restaurant_status,
-#                 'current_period_end': str(first_restaurant_period_end) if first_restaurant_period_end else None,
-#             }
-#         }
-
-#         return token
-
-#     def validate(self, attrs):
-#         data = super().validate(attrs)
-#         user = self.user
-#         user_data = UserWithRestaurantSerializer(user).data
-#         data['user'] = user_data
-#         return data
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -110,6 +57,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             if r.get('device_id') is not None and first_device_id is None:
                 first_device_id = r['device_id']
 
+        owner_id = get_restaurant_owner_id(user)
+
         token['user'] = {
             'id': user_data['id'],
             'username': user_data['username'],
@@ -121,7 +70,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                 'package_name': first_restaurant_package,
                 'status': first_restaurant_status,
                 'current_period_end': str(first_restaurant_period_end) if first_restaurant_period_end else None,
-            }
+            },
+            'owner_id': owner_id
         }
 
         return token

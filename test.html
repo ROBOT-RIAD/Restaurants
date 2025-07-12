@@ -17,8 +17,22 @@
 
   <script>
     let socket, peer, localStream, incomingOffer = null;
-    const jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzUxNTUyMDUzLCJpYXQiOjE3NTE1MDg4NTMsImp0aSI6Ijg3ODhjY2JmNzQyZDQ5MDE5MmE4ZjRiYzliZGZkMjE1IiwidXNlcl9pZCI6OTMsInVzZXIiOnsiaWQiOjkzLCJ1c2VybmFtZSI6Ik1kIEFiZHVsIGthbWFsIiwiZW1haWwiOiJ4YWxvbjQ3MjI5QGV4aXRiaXQuY29tIiwicm9sZSI6Im93bmVyIiwicmVzdGF1cmFudHNfaWQiOjI1LCJkZXZpY2VfaWQiOm51bGwsInN1YnNjcmlwdGlvbiI6eyJwYWNrYWdlX25hbWUiOm51bGwsInN0YXR1cyI6bnVsbCwiY3VycmVudF9wZXJpb2RfZW5kIjpudWxsfX19.opfMQoz5M_om2a9iWWGFmMKNMwJgT_hjjbYlFybgg0E";
-    const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+    const jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzUyMjQxNDc2LCJpYXQiOjE3NTIxOTgyNzYsImp0aSI6IjFmNGRhZDUyOTBiMzQ0YTFhODBhNDNhOTVlNDg0OGQxIiwidXNlcl9pZCI6OTMsInVzZXIiOnsiaWQiOjkzLCJ1c2VybmFtZSI6Ik1kIEFiZHVsIGthbWFsIiwiZW1haWwiOiJ4YWxvbjQ3MjI5QGV4aXRiaXQuY29tIiwicm9sZSI6Im93bmVyIiwicmVzdGF1cmFudHNfaWQiOjI1LCJkZXZpY2VfaWQiOm51bGwsInN1YnNjcmlwdGlvbiI6eyJwYWNrYWdlX25hbWUiOm51bGwsInN0YXR1cyI6bnVsbCwiY3VycmVudF9wZXJpb2RfZW5kIjpudWxsfSwib3duZXJfaWQiOjkzfX0.iJHUEb069dCPfMq8EP9YePHuulLMVv0oNbDygnPNtfI";
+    // const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+     const config = {
+
+          iceServers: [
+
+            { urls: 'stun:stun.l.google.com:19302' },
+
+            {
+              urls: "turn:openrelay.metered.ca:80",
+              username: "openrelayproject",
+              credential: "openrelayproject"
+            }
+          ]
+
+        };
 
     function updateStatus(text) {
       document.getElementById("status").innerText = `Status: ${text}`;
@@ -26,7 +40,7 @@
 
     async function connectSocket() {
       const deviceId = document.getElementById("deviceId").value;
-      socket = new WebSocket(`ws://localhost:8000/ws/call/${deviceId}/?token=${jwt}`);
+      socket = new WebSocket(`ws://sacred-renewing-dove.ngrok-free.app/ws/call/${deviceId}/?token=${jwt}`);
 
       socket.onopen = async () => {
         updateStatus("Connected");

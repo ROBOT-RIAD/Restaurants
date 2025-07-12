@@ -4,7 +4,7 @@ from restaurant.admin import Restaurant
 import secrets
 from django.core.mail import send_mail
 from django.conf import settings
-
+from .utils import get_restaurant_owner_id
 
 # jwt
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
@@ -46,10 +46,15 @@ class RestaurantSerializer(serializers.ModelSerializer):
 
 class UserWithRestaurantSerializer(serializers.ModelSerializer):
     restaurants = serializers.SerializerMethodField()
+    owner_id = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'role', 'image', 'restaurants']
+        fields = ['id', 'username', 'email', 'role', 'image', 'restaurants','owner_id']
+
+
+    def get_owner_id(self, obj):
+        return get_restaurant_owner_id(obj)
 
     def get_restaurants(self, obj):
         def get_subscription_info(restaurant):

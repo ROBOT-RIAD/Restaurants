@@ -5,10 +5,12 @@ from .models import Device, Reservation
 class DeviceSerializer(serializers.ModelSerializer):
     restaurant_name = serializers.CharField(source='restaurant.resturent_name', read_only=True)
     username = serializers.CharField(source='user.username', read_only=True)
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
     class Meta:
         model = Device
-        fields = ['id', 'table_name', 'restaurant', 'action','restaurant_name','username']
+        fields = ['id', 'table_name', 'restaurant', 'action','restaurant_name','username','user_id']
         read_only_fields =['username', 'restaurant_name','restaurant']
+
 
 
 

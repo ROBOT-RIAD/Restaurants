@@ -19,8 +19,23 @@
 
   <script>
     let socket, peer, localStream, incomingOffer = null;
-    const jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzUxNTUyMTU4LCJpYXQiOjE3NTE1MDg5NTgsImp0aSI6IjhkYjU3N2U4MjBmMjQ1ODg5MjI5NDcxNGY4OTBiMzNkIiwidXNlcl9pZCI6OTQsInVzZXIiOnsiaWQiOjk0LCJ1c2VybmFtZSI6ImdvbGRlbmRyYWdvbjI1NjMiLCJlbWFpbCI6ImdvbGRlbmRyYWdvbjI1NjNAZXhhbXBsZS5jb20iLCJyb2xlIjoiY3VzdG9tZXIiLCJyZXN0YXVyYW50c19pZCI6MjUsImRldmljZV9pZCI6MjgsInN1YnNjcmlwdGlvbiI6eyJwYWNrYWdlX25hbWUiOm51bGwsInN0YXR1cyI6bnVsbCwiY3VycmVudF9wZXJpb2RfZW5kIjpudWxsfX19.2xZ-EUI4vPrViJrOVbgjJVXsQeWCcA_zQdNIIGc9b8A";
-    const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+    const jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzUyMjQxNDI2LCJpYXQiOjE3NTIxOTgyMjYsImp0aSI6ImU3ZWRhZDA3YTdkYjRlOWZiMzEzOTk5ZGE0Y2NhYzA4IiwidXNlcl9pZCI6OTQsInVzZXIiOnsiaWQiOjk0LCJ1c2VybmFtZSI6ImdvbGRlbmRyYWdvbjI1NjMiLCJlbWFpbCI6ImdvbGRlbmRyYWdvbjI1NjNAZXhhbXBsZS5jb20iLCJyb2xlIjoiY3VzdG9tZXIiLCJyZXN0YXVyYW50c19pZCI6MjUsImRldmljZV9pZCI6MjgsInN1YnNjcmlwdGlvbiI6eyJwYWNrYWdlX25hbWUiOm51bGwsInN0YXR1cyI6bnVsbCwiY3VycmVudF9wZXJpb2RfZW5kIjpudWxsfSwib3duZXJfaWQiOjkzfX0.qKjmpKKyiN3gkgVKLt_0yROcYd5dm5wsrmLYe_rdVWg";
+    // const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+    const config = {
+
+          iceServers: [
+
+            { urls: 'stun:stun.l.google.com:19302' },
+
+            {
+              urls: "turn:openrelay.metered.ca:80",
+              username: "openrelayproject",
+              credential: "openrelayproject"
+            }
+          ]
+
+        };
+ 
 
     function updateStatus(text) {
       document.getElementById("status").innerText = `Status: ${text}`;
@@ -28,7 +43,7 @@
 
     async function connectSocket() {
       const deviceId = document.getElementById("deviceId").value;
-      socket = new WebSocket(`ws://localhost:8000/ws/call/${deviceId}/?token=${jwt}`);
+      socket = new WebSocket(`ws://sacred-renewing-dove.ngrok-free.app/ws/call/${deviceId}/?token=${jwt}`);
 
       socket.onopen = async () => {
         updateStatus("Connected");
