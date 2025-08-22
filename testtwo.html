@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment</title>
+    <script src="https://js.stripe.com/v3/"></script>
+    <style>
+        /* Basic styling for the form */
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f9f9f9;
+        }
+
+        .payment-form {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 400px;
+        }
+
+        .payment-form h2 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .payment-form .button {
+            width: 100%;
+            padding: 12px;
+            background-color: #5469d4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .payment-form .button:disabled {
+            background-color: #ccc;
+        }
+    </style>
+</head>
+<body>
+
+<div class="payment-form">
+    <h2>Complete Payment</h2>
+    <button id="payButton" class="button">Pay Now</button>
+</div>
+
+<script>
+    const stripe = Stripe('pk_test_51RoI1gC0zDhKpiWbVmhnfJqajuJzuHsydkHENy9RNXaj9mmEGmvCEVOiTj06qIFwm2soxClCgAxtLSFk6Zt3GkU600nU3ecnDu');
+
+    let clientSecret;
+
+    // Step 1: Create PaymentIntent
+    async function createPaymentIntent() {
+        const orderId = 1; // Set this dynamically based on your order
+
+        try {
+            const response = await fetch('/create-payment-intent/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ order_id: orderId })
+            });
+
+            const data = await response.json();
+            if (data.clientSecret) {
+                clientSecret = data.clientSecret;
+            } else {
+                alert("Failed to create payment intent.");
+            }
+        } catch (error) {
+            console.error("Error:", error);
+            alert("An error occurred while creating payment intent.");
+        }
+    }
+
+    // Step 2: Confirm Payment
+    async function confirmPayment(paymentMethodId) {
+        try {
+            const response = await fetch('/confirm-payment/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    payment_intent_id: clientSecret,
+                    payment_method_id: paymentMethodId
+                })
+            });
+
+            const data = await response.json();
+            if (data.status === "Payment completed successfully") {
+                alert("Payment successful!");
+            } else {
+                alert("Payment failed!");
+            }
+        } catch (error) {
+            console.error("Error:", error);
+            alert("Error during payment confirmation.");
+        }
+    }
+
+    // Step 3: Handle button click to process payment
+    document.getElementById('payButton').addEventListener('click', async () => {
+        if (!clientSecret) {
+            await createPaymentIntent();
+        }
+
+        const { error, paymentMethod } = await stripe.createPaymentMethod({
+            type: 'card',
+            card: {
+                // You can add elements here for card input if needed.
+            }
+        });
+
+        if (error) {
+            console.error(error);
+            alert(error.message);
+        } else {
+            confirmPayment(paymentMethod.id);
+        }
+    });
+</script>
+</body>
+</html>
