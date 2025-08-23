@@ -234,14 +234,15 @@ STRIPE_SECRET_KEY=env('STRIPE_SECRET_KEY')
 
 STRIPE_WEBHOOK_SECRET=env('STRIPE_WEBHOOK_SECRET')
 
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'postgres',
-        'USER': 'postgres',
-        'PASSWORD': '123',
-        'HOST': 'localhost', 
-        'PORT': '5432',
+        'NAME': env('DB_NAME', default='mydb'),
+        'USER': env('DB_USER', default='myuser'),
+        'PASSWORD': env('DB_PASSWORD', default='mypassword'),
+        'HOST': env('DB_HOST', default='db'),
+        'PORT': env('DB_PORT', default='5432'),
     }
 }
 
