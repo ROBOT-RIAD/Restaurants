@@ -12,11 +12,14 @@ from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
-from accounts.permissions import IsAllowedRole
+from accounts.permissions import IsAllowedRole,IsAdminRole
 from rest_framework import permissions
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from datetime import datetime, timezone as dt_timezone
 from django.db import transaction
+from .serializers import SubscriptionStatusUpdateSerializer
+from rest_framework import status
+
 
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -69,7 +72,6 @@ class StripePortalSessionView(APIView):
             return Response({'url': portal_session.url})
         except Exception as e:
             return Response({'error': str(e)}, status=400)
-
 
 
 
@@ -195,9 +197,6 @@ class StripeWebhookView(APIView):
 
 
 
-
-
-
 class CancelSubscriptionView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -227,8 +226,6 @@ class CancelSubscriptionView(APIView):
         
 
 
-
-
 class SubscriptionStatusView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -250,10 +247,6 @@ class SubscriptionStatusView(APIView):
             'cancel_at_period_end': subscription.cancel_at_period_end,
         })
     
-
-
-
-
 
 
 class RenewSubscriptionView(APIView):
@@ -283,3 +276,18 @@ class RenewSubscriptionView(APIView):
             return Response({'message': 'Subscription renewal activated.'}, status=200)
         except Exception as e:
             return Response({'error': str(e)}, status=400)
+
+
+
+
+
+class UpdateSubscriptionStatusAPIView(APIView):
+    permission_classes = [IsAdminRole]
+
+    def patch(self, request, restaurant_id):
+        status_value = request.data.get('status')
+        if not status_value:
+            return Response({"error": "Status is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        updated = Subscription.objects.filter(restaurant_id=restaurant_id).update(status=status_value)
+        return Response({"message": f"Updated {updated} subscription(s)"})
