@@ -7,6 +7,11 @@ from device.models import Device
 from accounts.models import User
 import logging
 from .models import CallSession
+import json
+import logging
+from channels.generic.websocket import AsyncWebsocketConsumer
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +74,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'type': 'chat_message',
                 'message': message,
                 'sender': sender.username,
+                'device_id' : self.device_id,
                 'is_from_device': is_from_device,
                 'timestamp': str(chat_message.timestamp),
             }
@@ -78,6 +84,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'message': event['message'],
             'sender': event['sender'],
+            'device_id': event['device_id'],
             'is_from_device': event['is_from_device'],
             'timestamp': event['timestamp'],
         }))
@@ -122,86 +129,154 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return None
         
 
+
+
+
+
+
+
+
+
+
+
 logger = logging.getLogger(__name__)
+
+
 class CallSignalConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.device_id = self.scope['url_route']['kwargs']['device_id']
         self.user = self.scope['user']
-        self.group_name = f"call_{self.device_id}"
+        self.user_info = self.scope.get('user_info', {})
+        self.group_name = f"room_{self.device_id}_{self.user_info.get('restaurants_id')}"
+
 
         if self.user and self.user.is_authenticated:
             await self.channel_layer.group_add(self.group_name, self.channel_name)
             await self.accept()
-            logger.debug(f"User {self.user} connected to {self.group_name}")
+            logger.debug(f"User {self.user.username} connected to {self.group_name}")
         else:
             await self.close()
 
+
     async def disconnect(self, close_code):
         await self.channel_layer.group_discard(self.group_name, self.channel_name)
+        await self.end_existing_calls(self.user.id)
+
 
     async def receive(self, text_data=None, bytes_data=None):
         if not text_data:
             return
-        data = json.loads(text_data)
-        action = data.get("action")
-        message_type = data.get("type")
+        try:
+            data = json.loads(text_data)
+            action = data.get("action")
+        except json.JSONDecodeError:
+            await self.send(text_data=json.dumps({"error": "Invalid JSON"}))
+            return
+
 
         if action == "start_call":
             await self.handle_start_call(data)
+        elif action == "accept_call":
+            await self.handle_accept_call(data)
         elif action == "end_call":
             await self.handle_end_call(data)
-        elif message_type in ["offer", "answer", "candidate"]:
-            await self.channel_layer.group_send(
-                self.group_name,
-                {
-                    'type': 'signal_message',
-                    'message': json.dumps(data)
-                }
-            )
+        else:
+            await self.send(text_data=json.dumps({"error": "Invalid action"}))
 
-    async def signal_message(self, event):
+
+    async def call_message(self, event):
         await self.send(text_data=event['message'])
+
 
     async def handle_start_call(self, data):
         receiver_id = data.get("receiver_id")
         device_id = data.get("device_id")
-        offer = data.get("offer")
+        restaurant_id = self.user_info.get('restaurants_id')
 
-        if not (receiver_id and device_id and offer):
-            await self.send(text_data=json.dumps({"error": "Missing receiver_id, device_id or offer"}))
+
+        if not (receiver_id and device_id and restaurant_id):
+            await self.send(text_data=json.dumps({"error": "Missing receiver_id, device_id, or restaurant_id"}))
             return
 
-        await self.end_existing_calls(self.user.id)
-        await self.create_call_session(self.user.id, receiver_id, device_id)
 
+        # End any existing active calls for the caller
+        await self.end_existing_calls(self.user.id)
+
+
+        # Create a new call session
+        call_session = await self.create_call_session(self.user.id, receiver_id, device_id)
+        if not call_session:
+            await self.send(text_data=json.dumps({"error": "Failed to create call session"}))
+            return
+
+
+        # Broadcast incoming call to the group
         await self.channel_layer.group_send(
-            f"call_{device_id}",
+            self.group_name,
             {
-                'type': 'signal_message',
+                'type': 'call_message',
                 'message': json.dumps({
                     "action": "incoming_call",
                     "from": self.user.username,
+                    "call_id": call_session.id,
                     "device_id": device_id,
-                    "type": "offer",
-                    "offer": offer
+                    "restaurant_id": restaurant_id
                 })
             }
         )
 
+
+    async def handle_accept_call(self, data):
+        call_id = data.get("call_id")
+        if not call_id:
+            await self.send(text_data=json.dumps({"error": "Missing call_id"}))
+            return
+
+
+        call_session = await self.get_call_session(call_id)
+        if not call_session or not call_session.is_active:
+            await self.send(text_data=json.dumps({"error": "Invalid or inactive call"}))
+            return
+
+
+        # Broadcast call accepted to the group
+        await self.channel_layer.group_send(
+            self.group_name,
+            {
+                'type': 'call_message',
+                'message': json.dumps({
+                    "action": "call_accepted",
+                    "from": self.user.username,
+                    "call_id": call_id
+                })
+            }
+        )
+
+
     async def handle_end_call(self, data):
+        call_id = data.get("call_id")
+        if call_id:
+            call_session = await self.get_call_session(call_id)
+            if call_session and call_session.is_active:
+                await self.end_call_session(call_session.id)
+
+
+        # End all active calls for the user as a fallback
         await self.end_existing_calls(self.user.id)
-        device_id = data.get("device_id")
-        if device_id:
-            await self.channel_layer.group_send(
-                f"call_{device_id}",
-                {
-                    'type': 'signal_message',
-                    'message': json.dumps({
-                        "action": "call_ended",
-                        "by": self.user.username
-                    })
-                }
-            )
+
+
+        # Broadcast call ended to the group
+        await self.channel_layer.group_send(
+            self.group_name,
+            {
+                'type': 'call_message',
+                'message': json.dumps({
+                    "action": "call_ended",
+                    "by": self.user.username
+                })
+            }
+        )
+
 
     @database_sync_to_async
     def create_call_session(self, caller_id, receiver_id, device_id):
@@ -211,11 +286,30 @@ class CallSignalConsumer(AsyncWebsocketConsumer):
             device = Device.objects.get(id=device_id)
             return CallSession.objects.create(caller=caller, receiver=receiver, device=device)
         except Exception as e:
-            logger.exception("Error creating call session")
+            logger.exception(f"Error creating call session: {str(e)}")
             return None
+
+
+    @database_sync_to_async
+    def get_call_session(self, call_id):
+        try:
+            return CallSession.objects.get(id=call_id)
+        except CallSession.DoesNotExist:
+            logger.warning(f"Call session with ID {call_id} does not exist.")
+            return None
+
 
     @database_sync_to_async
     def end_existing_calls(self, user_id):
         active_calls = CallSession.objects.filter(caller_id=user_id, is_active=True)
         for call in active_calls:
             call.end_call()
+
+
+    @database_sync_to_async
+    def end_call_session(self, call_id):
+        try:
+            call = CallSession.objects.get(id=call_id, is_active=True)
+            call.end_call()
+        except CallSession.DoesNotExist:
+            logger.warning(f"Call session with ID {call_id} does not exist or is already inactive.")

@@ -1,143 +1,190 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Owner Call Interface</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Owner Call Interface</title>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-  <h2>Owner Panel</h2>
-  <label>Device ID:</label><input type="text" id="deviceId" value="1"><br>
-  <label>Device User ID:</label><input type="text" id="deviceUserId" value="2"><br><br>
-  <button onclick="connectSocket()">Connect</button>
-  <button onclick="startCall()">Start Call</button>
-  <button onclick="receiveCall()" id="receiveBtn" disabled>Receive Call</button>
-  <button onclick="endCall()">End Call</button>
-  <p id="status">Status: Not connected</p>
-  <audio id="remoteAudio" autoplay></audio>
-  <audio id="localAudio" autoplay muted></audio>
-
-  <script>
-    let socket, peer, localStream, incomingOffer = null;
-    const jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU0OTk2MDQ1LCJpYXQiOjE3NTQzOTEyNDUsImp0aSI6IjU2OThiNWVhNTFjYjQ3YTNhMmM3NzBjMTU3MDk5NGVjIiwidXNlcl9pZCI6MSwidXNlciI6eyJpZCI6MSwidXNlcm5hbWUiOiJNZCBBYmR1bCBrYW1hbCIsImVtYWlsIjoibWlzaWplNzg3NkBlbmRpYml0LmNvbSIsInJvbGUiOiJvd25lciIsInJlc3RhdXJhbnRzX2lkIjoxLCJkZXZpY2VfaWQiOm51bGwsInN1YnNjcmlwdGlvbiI6eyJwYWNrYWdlX25hbWUiOm51bGwsInN0YXR1cyI6bnVsbCwiY3VycmVudF9wZXJpb2RfZW5kIjpudWxsfSwib3duZXJfaWQiOjF9fQ.wLVV4wplP8aqU6aKpmDTSK3mW7sDlvd9NF-9uF_xwI0";
-    const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
-
-    function updateStatus(text) {
-      document.getElementById("status").innerText = `Status: ${text}`;
-    }
-
-    async function connectSocket() {
-      const deviceId = document.getElementById("deviceId").value;
-      socket = new WebSocket(`wss://sacred-renewing-dove.ngrok-free.app/ws/call/${deviceId}/?token=${jwt}`);
-
-      socket.onopen = async () => {
-        updateStatus("Connected");
-        await setupMedia();
-      };
-
-      socket.onerror = (e) => console.error("Socket error", e);
-      socket.onclose = () => updateStatus("Disconnected");
-      socket.onmessage = handleSocketMessage;
-    }
-
-    async function handleSocketMessage(event) {
-      const data = JSON.parse(event.data);
-      console.log("Received:", data);
-
-      if (data.type === "answer") {
-        await peer.setRemoteDescription(new RTCSessionDescription(data.answer));
-        updateStatus("Call connected");
-      } else if (data.type === "candidate") {
-        await peer.addIceCandidate(new RTCIceCandidate(data.candidate));
-      } else if (data.action === "call_ended") {
-        updateStatus("Call ended");
-        closeCall();
-      }
-      else if(data.type === "offer"){
-        incomingOffer = data.offer;
-        document.getElementById("receiveBtn").disabled = false;
-        updateStatus("Incoming call...");
-      }
-    }
+<body class="bg-gray-100 font-sans">
+    <div class="container mx-auto p-4 max-w-md">
+        <h2 class="text-2xl font-bold mb-4">Owner Call Panel</h2>
+        <div class="mb-4">
+            <p class="text-gray-700">User: <span id="username">Loading...</span> | Role: owner</p>
+        </div>
+        <!-- Call Section -->
+        <div class="bg-white p-4 rounded-lg shadow">
+            <h3 class="text-xl font-semibold mb-2">Call Control</h3>
+            <div class="flex space-x-2 mb-2">
+                <div class="flex-1">
+                    <label class="text-gray-700">Device ID:</label>
+                    <input id="deviceId" type="text" class="w-full p-2 border rounded" value="2">
+                </div>
+                <div class="flex-1">
+                    <label class="text-gray-700">Device User ID:</label>
+                    <input id="deviceUserId" type="text" class="w-full p-2 border rounded" value="5">
+                </div>
+            </div>
+            <div id="call-status" class="mb-2 text-gray-700">Status: Not connected</div>
+            <div class="flex space-x-2 mb-2">
+                <button id="connect-btn" class="bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Connect</button>
+                <button id="start-call" class="bg-green-500 text-white p-2 rounded hover:bg-green-600">Start Call</button>
+                <button id="receive-call" class="bg-blue-500 text-white p-2 rounded hover:bg-blue-600 hidden">Receive Call</button>
+                <button id="end-call" class="bg-red-500 text-white p-2 rounded hover:bg-red-600 hidden">End Call</button>
+            </div>
+            <div id="call-notification" class="text-gray-700"></div>
+        </div>
+    </div>
 
 
-    async function receiveCall() {
-      if (!incomingOffer) return;
-      document.getElementById("receiveBtn").disabled = true;
-      updateStatus("Answering call...");
+    <script>
+        // Configuration (replace with actual values from backend)
+        const jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU3MTM5ODQyLCJpYXQiOjE3NTY1MzUwNDIsImp0aSI6ImEyNDE3M2MxMmQxNzRhM2I5NTNjMTJjOWRhNWIyNjg0IiwidXNlcl9pZCI6NCwidXNlciI6eyJpZCI6NCwidXNlcm5hbWUiOiJTYW5qaWRhIEtoYW5hbSIsImVtYWlsIjoic2FuamlkYS5pY2UuNzc4QGdtYWlsLmNvbSIsInJvbGUiOiJvd25lciIsInJlc3RhdXJhbnRzX2lkIjoyLCJkZXZpY2VfaWQiOm51bGwsInN1YnNjcmlwdGlvbiI6eyJwYWNrYWdlX25hbWUiOiJtb250aCAxIiwic3RhdHVzIjoiQWN0aXZlIiwiY3VycmVudF9wZXJpb2RfZW5kIjoiMjAyNS0wOS0xOCAxMTo0MDozMCswMDowMCJ9LCJvd25lcl9pZCI6NH19.fFxYFqAaGzZ0nUUSSJ768JSwSy8vlEQN8BDQiVDsBLY";
+        const username = "Sanjida Khanam";
+        const userRole = "owner";
+        const restaurantId = 2;
 
-      await setupPeerConnection();
-      await peer.setRemoteDescription(new RTCSessionDescription(incomingOffer));
-      const answer = await peer.createAnswer();
-      await peer.setLocalDescription(answer);
-      socket.send(JSON.stringify({ type: "answer", answer }));
 
-      updateStatus("Call answered");
-    }
+        // WebSocket connection
+        let callSocket;
+        let currentCallId = null;
 
-    async function setupMedia() {
-      try {
-        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        document.getElementById("localAudio").srcObject = localStream;
-      } catch (err) {
-        console.error("Media error:", err);
-        updateStatus("Failed to access microphone");
-      }
-    }
 
-    async function setupPeerConnection() {
-      peer = new RTCPeerConnection(config);
-      localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
+        // DOM elements
+        const deviceIdInput = document.getElementById("deviceId");
+        const deviceUserIdInput = document.getElementById("deviceUserId");
+        const callStatus = document.getElementById("call-status");
+        const callNotification = document.getElementById("call-notification");
+        const connectBtn = document.getElementById("connect-btn");
+        const startCallBtn = document.getElementById("start-call");
+        const receiveCallBtn = document.getElementById("receive-call");
+        const endCallBtn = document.getElementById("end-call");
+        const usernameSpan = document.getElementById("username");
 
-      peer.onicecandidate = ({ candidate }) => {
-        if (candidate) {
-          socket.send(JSON.stringify({ type: "candidate", candidate }));
+
+        // Initialize user info
+        usernameSpan.textContent = username;
+
+
+        // Connect WebSocket
+        function connectSocket() {
+            const deviceId = deviceIdInput.value;
+            callSocket = new WebSocket(`ws://127.0.0.1:8000/ws/call/${deviceId}/?token=${jwt}`);
+
+
+            callSocket.onopen = () => {
+                callStatus.textContent = "Status: Connected";
+                connectBtn.classList.add("hidden");
+                startCallBtn.classList.remove("hidden");
+            };
+            callSocket.onerror = (e) => {
+                console.error("Call WebSocket error:", e);
+                callStatus.textContent = "Status: Connection error";
+            };
+            callSocket.onclose = () => {
+                callStatus.textContent = "Status: Disconnected";
+                connectBtn.classList.remove("hidden");
+                startCallBtn.classList.remove("hidden");
+                receiveCallBtn.classList.add("hidden");
+                endCallBtn.classList.add("hidden");
+                currentCallId = null;
+            };
+            callSocket.onmessage = handleCallMessage;
         }
-      };
 
-      peer.ontrack = (event) => {
-        document.getElementById("remoteAudio").srcObject = event.streams[0];
-      };
-    }
 
-    async function startCall() {
-      const receiverId = document.getElementById("deviceUserId").value;
-      const deviceId = document.getElementById("deviceId").value;
-      if (!socket || socket.readyState !== WebSocket.OPEN) return;
+        // Handle call messages
+        function handleCallMessage(event) {
+            const data = JSON.parse(event.data);
+            if (data.error) {
+                callNotification.textContent = `Error: ${data.error}`;
+                console.error("Call error:", data.error);
+                return;
+            }
+            if (data.action === "incoming_call") {
+                currentCallId = data.call_id;
+                callNotification.textContent = `Incoming call from ${data.from} (Call ID: ${data.call_id})`;
+                callStatus.textContent = "Status: Incoming call";
+                startCallBtn.classList.add("hidden");
+                receiveCallBtn.classList.remove("hidden");
+                endCallBtn.classList.remove("hidden");
+            } else if (data.action === "call_accepted") {
+                callNotification.textContent = `Call accepted by ${data.from}`;
+                callStatus.textContent = `Status: Call active (Call ID: ${data.call_id})`;
+                startCallBtn.classList.add("hidden");
+                receiveCallBtn.classList.add("hidden");
+                endCallBtn.classList.remove("hidden");
+                // Connect to VOIP server here (e.g., Asterisk, not implemented)
+            } else if (data.action === "call_ended") {
+                callNotification.textContent = `Call ended by ${data.by}`;
+                callStatus.textContent = "Status: Idle";
+                startCallBtn.classList.remove("hidden");
+                receiveCallBtn.classList.add("hidden");
+                endCallBtn.classList.add("hidden");
+                currentCallId = null;
+            }
+        }
 
-      await setupPeerConnection();
-      const offer = await peer.createOffer();
-      await peer.setLocalDescription(offer);
 
-      socket.send(JSON.stringify({
-        action: "start_call",
-        receiver_id: receiverId,
-        device_id: deviceId,
-        type: "offer",
-        offer
-      }));
+        // Start call
+        function startCall() {
+            const receiverId = deviceUserIdInput.value;
+            const deviceId = deviceIdInput.value;
+            if (!callSocket || callSocket.readyState !== WebSocket.OPEN) {
+                callNotification.textContent = "Please connect to WebSocket first";
+                return;
+            }
+            if (!receiverId) {
+                callNotification.textContent = "Please enter a Device User ID";
+                return;
+            }
+            callSocket.send(JSON.stringify({
+                action: "start_call",
+                receiver_id: parseInt(receiverId),
+                device_id: parseInt(deviceId)
+            }));
+            callStatus.textContent = "Status: Calling device...";
+            startCallBtn.classList.add("hidden");
+            endCallBtn.classList.remove("hidden");
+        }
 
-      updateStatus("Calling device...");
-    }
 
-    function endCall() {
-      const deviceId = document.getElementById("deviceId").value;
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ action: "end_call", device_id: deviceId }));
-      }
-      closeCall();
-    }
+        // Receive (accept) call
+        function receiveCall() {
+            if (!currentCallId) {
+                callNotification.textContent = "No incoming call to accept";
+                return;
+            }
+            callSocket.send(JSON.stringify({
+                action: "accept_call",
+                call_id: currentCallId
+            }));
+            receiveCallBtn.classList.add("hidden");
+            endCallBtn.classList.remove("hidden");
+        }
 
-    function closeCall() {
-      if (peer) {
-        peer.close();
-        peer = null;
-      }
-      updateStatus("Idle");
-      incomingOffer = null;
-      document.getElementById("receiveBtn").disabled = true;
-    }
-  </script>
+
+        // End call
+        function endCall() {
+            if (callSocket && callSocket.readyState === WebSocket.OPEN && currentCallId) {
+                callSocket.send(JSON.stringify({
+                    action: "end_call",
+                    call_id: currentCallId
+                }));
+            }
+            callStatus.textContent = "Status: Idle";
+            startCallBtn.classList.remove("hidden");
+            receiveCallBtn.classList.add("hidden");
+            endCallBtn.classList.add("hidden");
+            currentCallId = null;
+        }
+
+
+        // Event listeners
+        connectBtn.addEventListener("click", connectSocket);
+        startCallBtn.addEventListener("click", startCall);
+        receiveCallBtn.addEventListener("click", receiveCall);
+        endCallBtn.addEventListener("click", endCall);
+    </script>
 </body>
 </html>
-
-
-

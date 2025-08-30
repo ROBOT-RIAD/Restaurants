@@ -12,7 +12,6 @@ from django.db.models import Sum, Count
 from calendar import month_name
 from restaurant.models import Restaurant
 from accounts.models import ChefStaff
-
 # date 
 from datetime import date,timedelta
 from django.db.models import Sum
@@ -45,6 +44,8 @@ class OrderCancelAPIView(APIView):
         return Response({"message": "Order cancelled successfully"})
     
 
+
+
 class MyOrdersAPIView(generics.ListAPIView):
     serializer_class = OrderDetailSerializer
     permission_classes = [IsAuthenticated,IsCustomerRole]
@@ -60,6 +61,8 @@ class MyOrdersAPIView(generics.ListAPIView):
         ).order_by('-created_time')
 
 
+
+
 class MySingleOrderAPIView(generics.RetrieveAPIView):
     serializer_class = OrderDetailSerializer
     permission_classes = [IsAuthenticated,IsCustomerRole]
@@ -70,7 +73,8 @@ class MySingleOrderAPIView(generics.RetrieveAPIView):
             device__user=self.request.user,
             status__in=['pending', 'preparing', 'served']
         )
-    
+
+
 
 
 class OwnerRestaurantOrdersAPIView(generics.ListAPIView):
@@ -141,12 +145,15 @@ class ChefStaffOrdersAPIView(generics.ListAPIView):
     def get_queryset(self):
         user = self.request.user
         # Get all restaurants where user is active staff/chef
-        restaurant_ids = ChefStaff.objects.filter(user=user, action='active').values_list('restaurant_id', flat=True)
-        return Order.objects.filter(restaurant_id__in=restaurant_ids).order_by('-created_time')
+        chef_staff_qs = ChefStaff.objects.filter(user=user)
+        restaurant_id = chef_staff_qs.first().restaurant_id
+
+        return Order.objects.filter(restaurant_id=restaurant_id).order_by('-created_time')
     
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
+        print("riad")
 
         page = self.paginate_queryset(queryset)
         serializer = self.get_serializer(page, many=True)
