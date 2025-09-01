@@ -7,7 +7,6 @@ import random
 # Create your models here.
 
 class User(AbstractUser):
-
     # extra field add 
     email = models.EmailField(unique=True)
     role = models.CharField(max_length=10,choices=ROLE_CHOICES,default='customer')

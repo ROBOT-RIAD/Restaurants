@@ -3,7 +3,7 @@ from .models import User,ChefStaff,PasswordResetOTP
 from rest_framework.generics import CreateAPIView
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from .serializers import RegisterSerializer,ChefStaffCreateSerializer,ChefStaffDetailSerializer,SendOTPSerializer, VerifyOTPSerializer, ResetPasswordSerializer,UserWithRestaurantSerializer
+from .serializers import RegisterSerializer,ChefStaffCreateSerializer,ChefStaffDetailSerializer,SendOTPSerializer, VerifyOTPSerializer, ResetPasswordSerializer,UserWithRestaurantSerializer,UserSerializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -20,6 +20,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.tokens import OutstandingToken,BlacklistedToken,RefreshToken
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from .utils import get_restaurant_owner_id
+from rest_framework.exceptions import NotFound
 # Create your views here.
 
 class RegisterApiView(CreateAPIView):
@@ -228,3 +229,18 @@ class ResetPasswordView(APIView):
 
         return Response({"message": "Password has been reset successfully."})
 
+
+
+class UserInfoAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, user_id):
+        try:
+            # Fetch the user by user_id
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            raise NotFound(detail="User not found")
+
+        # Serialize the user data
+        user_serializer = UserSerializer(user)
+        return Response(user_serializer.data)

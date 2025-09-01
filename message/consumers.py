@@ -228,6 +228,7 @@ class CallSignalConsumer(AsyncWebsocketConsumer):
 
     async def handle_accept_call(self, data):
         call_id = data.get("call_id")
+        device_id = data.get("device_id")
         if not call_id:
             await self.send(text_data=json.dumps({"error": "Missing call_id"}))
             return
@@ -247,7 +248,8 @@ class CallSignalConsumer(AsyncWebsocketConsumer):
                 'message': json.dumps({
                     "action": "call_accepted",
                     "from": self.user.username,
-                    "call_id": call_id
+                    "call_id": call_id,
+                    "device_id": device_id,
                 })
             }
         )
