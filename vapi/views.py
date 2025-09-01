@@ -10,7 +10,7 @@ import requests
 import json
 import re
 
-VAPI_API = "Bearer 1f29f028-c299-413f-8c2e-54fb406214cb"
+# VAPI_API = "Bearer 1f29f028-c299-413f-8c2e-54fb406214cb"
 CREATE_ASSISTANT = "https://api.vapi.ai/assistant"
 CREATE_PHONE = "https://api.vapi.ai/phone-number"
 CREATE_TOOL = "https://api.vapi.ai/tool"
