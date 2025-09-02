@@ -15,6 +15,8 @@ from accounts.models import ChefStaff
 # date 
 from datetime import date,timedelta
 from django.db.models import Sum
+from channels.layers import get_channel_layer
+channel_layer = get_channel_layer()
 
 class OrderCreateAPIView(generics.CreateAPIView):
     serializer_class = OrderCreateSerializer
@@ -130,6 +132,15 @@ class OwnerUpdateOrderStatusAPIView(APIView):
 
         order.status = new_status
         order.save()
+
+        channel_layer.group_send(
+            f'order_{order.id}',
+            {
+                'type': 'order_status_update',
+                'status': order.status,
+                'order_id': order.id,
+            }
+        )
         return Response({"message": "Order status updated", "status": order.status})
     
 
@@ -176,8 +187,6 @@ class ChefStaffOrdersAPIView(generics.ListAPIView):
 
     
 
-
-
 class ChefStaffUpdateOrderStatusAPIView(APIView):
     permission_classes = [IsAuthenticated,IsChefOrStaff]
 
@@ -196,6 +205,16 @@ class ChefStaffUpdateOrderStatusAPIView(APIView):
 
         order.status = new_status
         order.save()
+
+        channel_layer.group_send(
+            f'order_{order.id}',
+            {
+                'type': 'order_status_update',
+                'status': order.status,
+                'order_id': order.id,  # Include the order ID in the message
+            }
+        )
+
         return Response({"detail": f"Order status updated to {new_status}"}, status=status.HTTP_200_OK)
     
 

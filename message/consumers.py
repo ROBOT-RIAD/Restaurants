@@ -10,6 +10,7 @@ from .models import CallSession
 import json
 import logging
 from channels.generic.websocket import AsyncWebsocketConsumer
+from order.models import Order
 
 
 
@@ -128,12 +129,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
             logger.warning(f"Device not found when fetching user. Device ID: {device_id}")
             return None
         
-
-
-
-
-
-
 
 
 
@@ -315,3 +310,56 @@ class CallSignalConsumer(AsyncWebsocketConsumer):
             call.end_call()
         except CallSession.DoesNotExist:
             logger.warning(f"Call session with ID {call_id} does not exist or is already inactive.")
+
+
+
+
+
+class OrderConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        # Retrieve order id from the URL
+        self.order_id = self.scope['url_route']['kwargs']['order_id']
+        self.room_group_name = f'order_{self.order_id}'
+
+        # Join the WebSocket group for this order
+        await self.channel_layer.group_add(
+            self.room_group_name,
+            self.channel_name
+        )
+
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        # Leave the WebSocket group
+        await self.channel_layer.group_discard(
+            self.room_group_name,
+            self.channel_name
+        )
+
+    # Receive message from WebSocket
+    async def receive(self, text_data):
+        text_data_json = json.loads(text_data)
+        new_status = text_data_json.get('status')
+
+        # Broadcast the updated order status to WebSocket group
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'order_status_update',
+                'status': new_status,
+                'order_id': self.order_id,
+            }
+        )
+
+    # Receive message from the group
+    async def order_status_update(self, event):
+        status = event['status']
+        order_id = event['order_id']
+
+        # Send the status update to WebSocket
+        await self.send(text_data=json.dumps({
+            'status': status,
+            'order_id': order_id
+        }))
+
+

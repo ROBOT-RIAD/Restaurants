@@ -10,12 +10,13 @@ import requests
 import json
 import re
 
-# VAPI_API = "Bearer 1f29f028-c299-413f-8c2e-54fb406214cb"
+# VAPI_API = "Bearer 882ebc62-401b-44ad-b9c1-c7e289ae36cb"
 CREATE_ASSISTANT = "https://api.vapi.ai/assistant"
 CREATE_PHONE = "https://api.vapi.ai/phone-number"
 CREATE_TOOL = "https://api.vapi.ai/tool"
 UPDATE_NUMBER = "https://api.vapi.ai/phone-number"
 UPDATE_TOOL = "https://api.vapi.ai/tool"
+
 
 
 def sanitize_name(restaurant_name):
