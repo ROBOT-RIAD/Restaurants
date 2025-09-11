@@ -132,14 +132,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
 
 
-
-
 logger = logging.getLogger(__name__)
-
 
 class CallSignalConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        self.device_id = self.scope['url_route']['kwargs']['device_id']
+        self.device_id = self.scope['url_route']['kwargs']['Divice_id']
         self.user = self.scope['user']
         self.user_info = self.scope.get('user_info', {})
         self.group_name = f"room_{self.device_id}_{self.user_info.get('restaurants_id')}"
@@ -314,14 +311,13 @@ class CallSignalConsumer(AsyncWebsocketConsumer):
 
 
 
-
 class OrderConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        # Retrieve order id from the URL
-        self.order_id = self.scope['url_route']['kwargs']['order_id']
-        self.room_group_name = f'order_{self.order_id}'
+        # Retrieve device id from the URL
+        self.device_id = self.scope['url_route']['kwargs']['device_id']
+        self.room_group_name = f'device_{self.device_id}'
 
-        # Join the WebSocket group for this order
+        # Join the WebSocket group for this device
         await self.channel_layer.group_add(
             self.room_group_name,
             self.channel_name
@@ -336,30 +332,137 @@ class OrderConsumer(AsyncWebsocketConsumer):
             self.channel_name
         )
 
-    # Receive message from WebSocket
-    async def receive(self, text_data):
-        text_data_json = json.loads(text_data)
-        new_status = text_data_json.get('status')
-
-        # Broadcast the updated order status to WebSocket group
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                'type': 'order_status_update',
-                'status': new_status,
-                'order_id': self.order_id,
-            }
-        )
-
     # Receive message from the group
     async def order_status_update(self, event):
-        status = event['status']
         order_id = event['order_id']
+        status = event['status']
 
         # Send the status update to WebSocket
         await self.send(text_data=json.dumps({
-            'status': status,
-            'order_id': order_id
+            'order_id': order_id,
+            'status': status
         }))
+
+
+
+
+
+class RestaurantConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        self.restaurant_id = self.scope['url_route']['kwargs']['restaurant_id']
+        self.room_group_name = f'restaurant_{self.restaurant_id}'
+
+        await self.channel_layer.group_add(self.room_group_name, self.channel_name)
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
+
+
+    # Category created
+    async def category_created(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "category_created",
+            "category": event["category"]
+        }))
+
+    # Category updated
+    async def category_updated(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "category_updated",
+            "category": event["category"]
+        }))
+
+    # Category deleted
+    async def category_deleted(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "category_deleted",
+            "category_id": event["category_id"]
+        }))
+    
+
+    # --- Item events ---
+    async def item_created(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "item_created",
+            "item": event["item"]
+        }))
+
+    async def item_updated(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "item_updated",
+            "item": event["item"]
+        }))
+
+    async def item_deleted(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "item_deleted",
+            "item_id": event["item_id"]
+        }))
+
+    
+    # --- Order events ---
+    async def order_created(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "order_created",
+            "order": event["order"]
+        }))
+
+    async def order_updated(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "order_updated",
+            "order": event["order"]
+        }))
+
+
+    
+    # --- Device events ---
+    async def device_created(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "device_created",
+            "device": event["device"]
+        }))
+
+    async def device_updated(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "device_updated",
+            "device": event["device"]
+        }))
+
+    async def device_deleted(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "device_deleted",
+            "device_id": event["device_id"]
+        }))
+
+
+
+    # --- Reservation events ---
+    async def reservation_created(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "reservation_created",
+            "reservation": event["reservation"]
+        }))
+
+    async def reservation_updated(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "reservation_updated",
+            "reservation": event["reservation"]
+        }))
+
+    # --- Review Events ---
+    async def review_created(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "review_created",
+            "review": event["review"]
+        }))
+
+    # --- Payment Events ---
+    async def order_paid(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "order_paid",
+            "order": event["order"]
+        }))
+
 
 

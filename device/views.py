@@ -21,6 +21,10 @@ from django.utils.dateparse import parse_date
 from django_filters.rest_framework import DjangoFilterBackend
 from datetime import timedelta
 from django.utils.timezone import now
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+
+channel_layer = get_channel_layer()
 
 def generate_username(restaurant_name):
     number = random.randint(1000, 9999)
@@ -64,7 +68,7 @@ class DeviceViewSet(viewsets.ModelViewSet):
             role='customer'
         )
 
-        serializer.save(user=device_user, restaurant=restaurant)
+        device=serializer.save(user=device_user, restaurant=restaurant)
 
         print(owner.email)
 
@@ -74,6 +78,44 @@ class DeviceViewSet(viewsets.ModelViewSet):
             from_email=settings.EMAIL_HOST_USER,
             recipient_list=[owner.email],
             fail_silently=False
+        )
+
+        data = DeviceSerializer(device).data
+        async_to_sync(channel_layer.group_send)(
+            f"restaurant_{restaurant.id}",
+            {
+                "type": "device_created",
+                "device": data
+            }
+        )
+    
+    def perform_update(self, serializer):
+        device = serializer.save()
+        restaurant = device.restaurant
+
+        # 🔥 WebSocket Broadcast - device updated
+        data = DeviceSerializer(device).data
+        async_to_sync(channel_layer.group_send)(
+            f"restaurant_{restaurant.id}",
+            {
+                "type": "device_updated",
+                "device": data
+            }
+        )
+
+    
+    def perform_destroy(self, instance):
+        restaurant = instance.restaurant
+        device_id = instance.id
+        instance.delete()
+
+        # 🔥 WebSocket Broadcast - device deleted
+        async_to_sync(channel_layer.group_send)(
+            f"restaurant_{restaurant.id}",
+            {
+                "type": "device_deleted",
+                "device_id": device_id
+            }
         )
 
     @action(detail=False, methods=['get'], url_path='stats')
@@ -95,9 +137,6 @@ class DeviceViewSet(viewsets.ModelViewSet):
 
 
 
-
-
-
 class CreateReservationAPIView(APIView):
     permission_classes = [AllowAny]
 
@@ -116,9 +155,18 @@ class CreateReservationAPIView(APIView):
 
         serializer = ReservationSerializer(data=data)
         if serializer.is_valid():
-            serializer.save()
+            reservation =serializer.save()
+            data = ReservationSerializer(reservation).data
+            async_to_sync(channel_layer.group_send)(
+                f"restaurant_{device.restaurant.id}",
+                {
+                    "type": "reservation_created",
+                    "reservation": data
+                }
+            )
             return Response({"message": "Reservation created successfully"}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 
@@ -167,7 +215,16 @@ class ReservationViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(reservation, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        reservation = serializer.save()
+
+        data = ReservationSerializer(reservation).data
+        async_to_sync(channel_layer.group_send)(
+            f"restaurant_{reservation.restaurant.id}",
+            {
+                "type": "reservation_updated",
+                "reservation": data
+            }
+        )
         return Response(serializer.data)
     
     @action(detail=False, methods=['get'], url_path='report-reservation-status')
@@ -216,9 +273,6 @@ class ReservationViewSet(viewsets.ModelViewSet):
 
 
 
-
-
-
 class DeviceViewSetall(viewsets.ReadOnlyModelViewSet):
     serializer_class = DeviceSerializer
     permission_classes = [permissions.IsAuthenticated,IsOwnerChefOrStaff]
@@ -235,3 +289,6 @@ class DeviceViewSetall(viewsets.ReadOnlyModelViewSet):
             return Device.objects.filter(restaurant_id__in=restaurant_ids)
 
         return Device.objects.none()
+    
+
+

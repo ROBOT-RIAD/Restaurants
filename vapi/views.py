@@ -307,6 +307,7 @@ class UpdateAssistantNumber(APIView):
 
     
         phone_number_update_response = self.update_phone_number(phone_number_id, twilio_number, twilio_account_sid, twilio_auth_token)
+        
 
         if not phone_number_update_response:
             return Response({"error": "Failed to update the phone number in VAPI."}, status=status.HTTP_400_BAD_REQUEST)

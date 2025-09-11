@@ -19,6 +19,10 @@ from rest_framework.views import APIView
 from django.db.models import Sum, F
 from order.models import OrderItem
 from restaurant.models import Restaurant
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+
+channel_layer = get_channel_layer()
 
 
 
@@ -63,7 +67,8 @@ class ItemViewSet(viewsets.ModelViewSet):
         else:
             raise PermissionDenied("You are not authorized to add items.")
 
-        serializer.save(restaurant=restaurant)
+        item = serializer.save(restaurant=restaurant)
+        self.send_ws_event("item_created", item)
 
     def is_user_authorized(self, item):
         user = self.request.user
@@ -81,12 +86,48 @@ class ItemViewSet(viewsets.ModelViewSet):
         item = self.get_object()
         if not self.is_user_authorized(item):
             raise PermissionDenied("You don't have permission to update this item.")
-        serializer.save()
+        item = serializer.save()
+        self.send_ws_event("item_updated", item)
 
     def perform_destroy(self, instance):
         if not self.is_user_authorized(instance):
             raise PermissionDenied("You don't have permission to delete this item.")
+        
+        restaurant_id = instance.restaurant.id
+        item_id = instance.id
         instance.delete()
+        async_to_sync(channel_layer.group_send)(
+            f"restaurant_{restaurant_id}",
+            {
+                "type": "item_deleted",
+                "item_id": item_id
+            }
+        )
+
+    def is_user_authorized(self, item):
+        user = self.request.user
+        if item.restaurant.owner == user:
+            return True
+        elif user.role in ['chef', 'staff', 'owner' , 'customer']:
+            return ChefStaff.objects.filter(
+                user=user,
+                restaurant=item.restaurant,
+                action='accepted'
+            ).exists()
+        return False
+    
+    def send_ws_event(self, event_type, item):
+        """Helper method to broadcast item events"""
+        restaurant_id = item.restaurant.id
+        data = ItemSerializer(item).data
+
+        async_to_sync(channel_layer.group_send)(
+            f"restaurant_{restaurant_id}",
+            {
+                "type": event_type,
+                "item": data
+            }
+        )
 
 
 

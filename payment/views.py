@@ -11,7 +11,11 @@ from rest_framework.viewsets import ModelViewSet
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+from order.serializers import OrderDetailSerializer
 
+channel_layer = get_channel_layer()
 
 
 
@@ -122,7 +126,14 @@ class PaymentSuccessView(APIView):
                 order = payment.order
                 order.status = "completed"
                 order.save()
-
+                order_data = OrderDetailSerializer(order).data
+                async_to_sync(channel_layer.group_send)(
+                    f"restaurant_{order.restaurant.id}",
+                    {
+                        "type": "order_paid",
+                        "order": order_data
+                    }
+                )
                 return Response({'session': session}, status=status.HTTP_200_OK)
             except Payment.DoesNotExist:
                 return Response({'error': 'Payment not found'}, status=status.HTTP_404_NOT_FOUND)

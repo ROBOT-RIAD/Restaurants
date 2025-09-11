@@ -17,6 +17,10 @@ from datetime import date,timedelta
 from django.db.models import Sum
 from channels.layers import get_channel_layer
 channel_layer = get_channel_layer()
+from asgiref.sync import async_to_sync
+
+
+
 
 class OrderCreateAPIView(generics.CreateAPIView):
     serializer_class = OrderCreateSerializer
@@ -24,7 +28,16 @@ class OrderCreateAPIView(generics.CreateAPIView):
 
     def perform_create(self, serializer):
         device = self.request.user.devices.first()  # Assuming 1 device per user
-        serializer.save(device=device, restaurant=device.restaurant)
+        order = serializer.save(device=device, restaurant=device.restaurant) 
+        data = OrderDetailSerializer(order).data
+        async_to_sync(channel_layer.group_send)(
+            f"restaurant_{order.restaurant.id}",
+            {
+                "type": "order_created",
+                "order": data
+            }
+        )
+
 
 
         
@@ -43,8 +56,17 @@ class OrderCancelAPIView(APIView):
 
         order.status = 'cancelled'
         order.save()
+        data = OrderDetailSerializer(order).data
+        async_to_sync(channel_layer.group_send)(
+            f"restaurant_{order.restaurant.id}",
+            {
+                "type": "order_updated",
+                "order": data
+            }
+        )
         return Response({"message": "Order cancelled successfully"})
     
+
 
 
 
@@ -65,6 +87,7 @@ class MyOrdersAPIView(generics.ListAPIView):
 
 
 
+
 class MySingleOrderAPIView(generics.RetrieveAPIView):
     serializer_class = OrderDetailSerializer
     permission_classes = [IsAuthenticated,IsCustomerRole]
@@ -75,6 +98,7 @@ class MySingleOrderAPIView(generics.RetrieveAPIView):
             device__user=self.request.user,
             status__in=['pending', 'preparing', 'served']
         )
+
 
 
 
@@ -133,16 +157,27 @@ class OwnerUpdateOrderStatusAPIView(APIView):
         order.status = new_status
         order.save()
 
-        channel_layer.group_send(
-            f'order_{order.id}',
+        async_to_sync(channel_layer.group_send)(
+            f'device_{order.device_id}',  # <-- send to device_id group
             {
                 'type': 'order_status_update',
                 'status': order.status,
                 'order_id': order.id,
             }
         )
+
+        data = OrderDetailSerializer(order).data
+        async_to_sync(channel_layer.group_send)(
+            f"restaurant_{order.restaurant.id}",
+            {
+                "type": "order_updated",
+                "order": data
+            }
+        )
+        
         return Response({"message": "Order status updated", "status": order.status})
     
+
 
 
 
@@ -185,7 +220,7 @@ class ChefStaffOrdersAPIView(generics.ListAPIView):
         })
     
 
-    
+  
 
 class ChefStaffUpdateOrderStatusAPIView(APIView):
     permission_classes = [IsAuthenticated,IsChefOrStaff]
@@ -206,17 +241,28 @@ class ChefStaffUpdateOrderStatusAPIView(APIView):
         order.status = new_status
         order.save()
 
-        channel_layer.group_send(
-            f'order_{order.id}',
+        async_to_sync(channel_layer.group_send)(
+            f'device_{order.device_id}',  # <-- send to device_id group
             {
                 'type': 'order_status_update',
                 'status': order.status,
-                'order_id': order.id,  # Include the order ID in the message
+                'order_id': order.id,
+            }
+        )
+
+        data = OrderDetailSerializer(order).data
+        async_to_sync(channel_layer.group_send)(
+            f"restaurant_{order.restaurant.id}",
+            {
+                "type": "order_updated",
+                "order": data
             }
         )
 
         return Response({"detail": f"Order status updated to {new_status}"}, status=status.HTTP_200_OK)
     
+
+
 
 
 class OrderAnalyticsAPIView(APIView):

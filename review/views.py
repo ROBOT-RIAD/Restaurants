@@ -11,6 +11,10 @@ from .pagination import TenPerPagePagination
 from django.utils.timezone import now
 from rest_framework.decorators import action
 from django.db.models import Avg
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+
+channel_layer = get_channel_layer()
 
 # Create your views here.
 
@@ -35,7 +39,16 @@ class CreateReviewAPIView(generics.CreateAPIView):
         if hasattr(order, 'review'):
             raise ValidationError("This order already has a review.")
 
-        serializer.save(device=device)
+        review = serializer.save(device=device)
+        review_data = GetReviewSerializer(review).data
+
+        async_to_sync(channel_layer.group_send)(
+            f"restaurant_{device.restaurant.id}",
+            {
+                "type": "review_created",
+                "review": review_data
+            }
+        )
 
 
 
