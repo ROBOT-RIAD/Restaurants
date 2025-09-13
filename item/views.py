@@ -131,6 +131,8 @@ class ItemViewSet(viewsets.ModelViewSet):
 
 
 
+
+
 class StaffItemViewSet(viewsets.ModelViewSet):
     queryset = Item.objects.all()
     permission_classes = [permissions.IsAuthenticated, IsStaffRole]
@@ -147,16 +149,32 @@ class StaffItemViewSet(viewsets.ModelViewSet):
             return Item.objects.filter(restaurant=chef_staff.restaurant)
         except ChefStaff.DoesNotExist:
             return Item.objects.none()
+    def send_ws_event(self, event_type, item=None, item_id=None):
+        """Broadcast update/delete events to WebSocket"""
+        restaurant_id = item.restaurant.id if item else None
+        data = ItemSerializer(item).data if item else None
+
+        async_to_sync(channel_layer.group_send)(
+            f"restaurant_{restaurant_id}",
+            {
+                "type": event_type, 
+                "item": data,
+            }
+        )
 
     def perform_update(self, serializer):
         if not IsStafforChefOfRestaurant().has_object_permission(self.request, self, serializer.instance):
             raise PermissionDenied("You are not authorized to update this item.")
-        serializer.save()
+        item = serializer.save()
+        self.send_ws_event("item_updated", item=item)
 
     def perform_destroy(self, instance):
         if not IsStafforChefOfRestaurant().has_object_permission(self.request, self, instance):
             raise PermissionDenied("You are not authorized to delete this item.")
+        restaurant_id = instance.restaurant.id
+        item_id = instance.id
         instance.delete()
+        self.send_ws_event("item_deleted", item_id=item_id)
 
     
 
@@ -200,16 +218,33 @@ class ChefItemViewSet(viewsets.ModelViewSet):
             return Item.objects.filter(restaurant=chef_staff.restaurant)
         except ChefStaff.DoesNotExist:
             return Item.objects.none()
+        
+    def send_ws_event(self, event_type, item=None, item_id=None):
+        """Broadcast update/delete events to WebSocket"""
+        restaurant_id = item.restaurant.id if item else None
+        data = ItemSerializer(item).data if item else None
+
+        async_to_sync(channel_layer.group_send)(
+            f"restaurant_{restaurant_id}",
+            {
+                "type": event_type,   # Must match method in consumer
+                "item": data,
+            }
+        )
 
     def perform_update(self, serializer):
         if not IsStafforChefOfRestaurant().has_object_permission(self.request, self, serializer.instance):
             raise PermissionDenied("You are not authorized to update this item.")
-        serializer.save()
+        item = serializer.save()
+        self.send_ws_event("item_updated", item=item)
 
     def perform_destroy(self, instance):
         if not IsStafforChefOfRestaurant().has_object_permission(self.request, self, instance):
             raise PermissionDenied("You are not authorized to delete this item.")
+        restaurant_id = instance.restaurant.id
+        item_id = instance.id
         instance.delete()
+        self.send_ws_event("item_deleted", item_id=item_id)
 
     
     @action(detail=False,methods=['get'],url_path='status-summary')
